@@ -3,28 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import {
-  Plus,
-  Edit2,
-  Trash2,
-  Clock,
-  AlertTriangle,
-  AlertCircle,
-  ChevronDown,
-  Search,
-  GitBranch,
-  Calendar,
-  X,
-  Check,
-  RefreshCw,
-} from "lucide-react";
+import { Plus, ChevronDown, Search, X, RefreshCw } from "lucide-react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { PageHeader } from "@/components/ui/page-header";
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   getActiveEvent,
@@ -37,10 +20,11 @@ import {
   updateTask,
   deleteTask,
 } from "@/lib/storage";
-import { useModalA11y } from "@/lib/use-modal-a11y";
 import { generateDeterministicTasks, detectDependencyCycle } from "@/lib/planner-engine";
-import { EventData, EventTask, TaskPriority, TaskStatus } from "@/types/event";
-import { TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from "@/lib/constants";
+import { EventData, EventTask, TaskStatus } from "@/types/event";
+import { TimelineMetrics } from "@/components/timeline/timeline-metrics";
+import { TaskCard } from "@/components/timeline/task-card";
+import { TaskModal, TaskFormData } from "@/components/timeline/task-modal";
 
 type FilterTab = "all" | "upcoming" | "overdue" | "completed";
 
@@ -61,19 +45,6 @@ function TimelineTasksContent() {
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingTask, setEditingTask] = React.useState<EventTask | null>(null);
   const [cycleError, setCycleError] = React.useState<string | null>(null);
-
-  // Accessible modal focus management & Escape dismissal
-  const addTaskModalRef = useModalA11y(isAddModalOpen, () => setIsAddModalOpen(false));
-  const editTaskModalRef = useModalA11y(Boolean(editingTask), () => setEditingTask(null));
-
-  // Form states for Add Task
-  const [newTitle, setNewTitle] = React.useState("");
-  const [newDescription, setNewDescription] = React.useState("");
-  const [newStartDate, setNewStartDate] = React.useState("");
-  const [newDueDate, setNewDueDate] = React.useState("");
-  const [newPriority, setNewPriority] = React.useState<TaskPriority>("Medium");
-  const [newStatus, setNewStatus] = React.useState<TaskStatus>("Not Started");
-  const [newDependencies, setNewDependencies] = React.useState<string[]>([]);
 
   // Load active event & tasks
   const loadData = React.useCallback(() => {
@@ -124,14 +95,14 @@ function TimelineTasksContent() {
   };
 
   // Helper to determine if a task is overdue deterministically
-  const isTaskOverdue = (task: EventTask): boolean => {
+  const isTaskOverdue = React.useCallback((task: EventTask): boolean => {
     if (task.status === "Completed") return false;
     if (!task.dueDate) return false;
     const due = new Date(task.dueDate);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return due < today;
-  };
+  }, []);
 
   // Helper to determine if task is blocked by incomplete dependencies
   const getIncompleteDependencies = (task: EventTask): EventTask[] => {
@@ -147,6 +118,9 @@ function TimelineTasksContent() {
   const inProgressTasks = tasks.filter((t) => t.status === "In Progress").length;
   const overdueTasks = tasks.filter((t) => isTaskOverdue(t)).length;
   const completionPercentage = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+  const highPriorityPendingCount = tasks.filter(
+    (t) => t.priority === "High" && t.status !== "Completed"
+  ).length;
 
   // Filter tasks based on activeTab and searchQuery
   const filteredTasks = React.useMemo(() => {
@@ -168,7 +142,7 @@ function TimelineTasksContent() {
 
       return true;
     });
-  }, [tasks, activeTab, searchQuery]);
+  }, [tasks, activeTab, searchQuery, isTaskOverdue]);
 
   // Toggle complete / quick status change
   const handleToggleComplete = (task: EventTask) => {
@@ -203,16 +177,15 @@ function TimelineTasksContent() {
   };
 
   // Add Task with Cycle Prevention Check
-  const handleAddTaskSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!event || !newTitle.trim() || !newDueDate) return;
+  const handleAddTask = (formData: TaskFormData) => {
+    if (!event) return;
 
     setCycleError(null);
 
     // Create a temporary ID to test for cycles if dependencies are selected
     const tempId = `temp_${Date.now()}`;
-    if (newDependencies.length > 0) {
-      const cycleCheck = detectDependencyCycle(tasks, tempId, newDependencies);
+    if (formData.dependencyIds.length > 0) {
+      const cycleCheck = detectDependencyCycle(tasks, tempId, formData.dependencyIds);
       if (cycleCheck.hasCycle) {
         setCycleError(cycleCheck.errorMessage || "Circular dependency detected. Please adjust prerequisites.");
         return;
@@ -220,57 +193,48 @@ function TimelineTasksContent() {
     }
 
     const added = addTask(event.id, {
-      title: newTitle.trim(),
-      description: newDescription.trim(),
-      startDate: newStartDate || undefined,
-      dueDate: newDueDate,
-      priority: newPriority,
-      status: newStatus,
-      dependencyIds: newDependencies,
+      title: formData.title,
+      description: formData.description,
+      startDate: formData.startDate,
+      dueDate: formData.dueDate,
+      priority: formData.priority,
+      status: formData.status,
+      dependencyIds: formData.dependencyIds,
     });
 
     setTasks((prev) => [...prev, added]);
     setIsAddModalOpen(false);
-
-    // Reset form
-    setNewTitle("");
-    setNewDescription("");
-    setNewStartDate("");
-    setNewDueDate("");
-    setNewPriority("Medium");
-    setNewStatus("Not Started");
-    setNewDependencies([]);
     setCycleError(null);
   };
 
   // Edit Task with Cycle Prevention Check
-  const handleSaveEdit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingTask || !editingTask.title.trim() || !editingTask.dueDate) return;
+  const handleSaveEdit = (formData: TaskFormData) => {
+    if (!editingTask) return;
 
     setCycleError(null);
 
     // Cycle check: Ensure task does not create a cycle with its new dependencyIds
-    const cycleCheck = detectDependencyCycle(tasks, editingTask.id, editingTask.dependencyIds);
+    const cycleCheck = detectDependencyCycle(tasks, editingTask.id, formData.dependencyIds);
     if (cycleCheck.hasCycle) {
       setCycleError(cycleCheck.errorMessage || "Circular dependency detected. A task cannot depend on a successor.");
       return;
     }
 
     const updated = updateTask(editingTask.id, {
-      title: editingTask.title.trim(),
-      description: editingTask.description.trim(),
-      startDate: editingTask.startDate || undefined,
-      dueDate: editingTask.dueDate,
-      priority: editingTask.priority,
-      status: editingTask.status,
-      dependencyIds: editingTask.dependencyIds,
+      title: formData.title,
+      description: formData.description,
+      startDate: formData.startDate,
+      dueDate: formData.dueDate,
+      priority: formData.priority,
+      status: formData.status,
+      dependencyIds: formData.dependencyIds,
     });
 
     if (updated) {
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
     }
     setEditingTask(null);
+    setCycleError(null);
   };
 
   // Delete Task
@@ -397,90 +361,14 @@ function TimelineTasksContent() {
         </div>
 
         {/* Milestone Progress Metrics */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Card 1: Overall Completion */}
-          <Card className="p-5 border-[#EBE5DC]">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B635B]">
-                Task Completion
-              </span>
-              <span className="text-[11px] font-semibold text-[#3F7A56] bg-[#F0F7F3] px-2 py-0.5 rounded-full">
-                {completionPercentage}% Done
-              </span>
-            </div>
-            <div className="flex items-baseline gap-1 mt-1">
-              <span className="font-serif text-2xl font-bold text-[#1F1A17]">
-                {completedTasks}
-              </span>
-              <span className="text-sm text-[#6B635B]">/ {totalTasks} Tasks</span>
-            </div>
-            <div className="w-full h-2 bg-[#EBE5DC] rounded-full overflow-hidden mt-3">
-              <div
-                className="h-full bg-[#3F7A56] transition-all duration-300"
-                style={{ width: `${completionPercentage}%` }}
-              />
-            </div>
-          </Card>
-
-          {/* Card 2: In Progress */}
-          <Card className="p-5 border-[#EBE5DC]">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B635B]">
-              In Progress
-            </span>
-            <div className="flex items-baseline gap-1 mt-1">
-              <span className="font-serif text-2xl font-bold text-[#C8963E]">
-                {inProgressTasks}
-              </span>
-              <span className="text-sm text-[#6B635B]">Active milestones</span>
-            </div>
-            <p className="text-[11px] text-[#6B635B] mt-1">
-              Tasks currently being coordinated with vendors
-            </p>
-          </Card>
-
-          {/* Card 3: Overdue Tasks */}
-          <Card className="p-5 border-[#EBE5DC]">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B635B]">
-                Overdue Deadlines
-              </span>
-              {overdueTasks > 0 && (
-                <span className="text-[11px] font-semibold text-[#C05621] bg-[#FFF5F0] px-2 py-0.5 rounded-full animate-pulse">
-                  Attention Needed
-                </span>
-              )}
-            </div>
-            <div className="flex items-baseline gap-1 mt-1">
-              <span
-                className={`font-serif text-2xl font-bold ${
-                  overdueTasks > 0 ? "text-[#C05621]" : "text-[#1F1A17]"
-                }`}
-              >
-                {overdueTasks}
-              </span>
-              <span className="text-sm text-[#6B635B]">Tasks past due</span>
-            </div>
-            <p className="text-[11px] text-[#6B635B] mt-1">
-              {overdueTasks > 0 ? "Requires date revision or vendor push" : "All deadlines currently on track"}
-            </p>
-          </Card>
-
-          {/* Card 4: High Priority Pending */}
-          <Card className="p-5 border-[#EBE5DC]">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-[#6B635B]">
-              Critical High Priority
-            </span>
-            <div className="flex items-baseline gap-1 mt-1">
-              <span className="font-serif text-2xl font-bold text-[#5B1D2E]">
-                {tasks.filter((t) => t.priority === "High" && t.status !== "Completed").length}
-              </span>
-              <span className="text-sm text-[#6B635B]">Pending high-stakes</span>
-            </div>
-            <p className="text-[11px] text-[#6B635B] mt-1">
-              Essential for core celebration execution
-            </p>
-          </Card>
-        </div>
+        <TimelineMetrics
+          totalTasks={totalTasks}
+          completedTasks={completedTasks}
+          inProgressTasks={inProgressTasks}
+          overdueTasks={overdueTasks}
+          completionPercentage={completionPercentage}
+          highPriorityPendingCount={highPriorityPendingCount}
+        />
 
         {/* Filters & Search Toolbar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
@@ -576,168 +464,24 @@ function TimelineTasksContent() {
           <div className="space-y-3.5">
             {filteredTasks.map((task) => {
               const isOverdue = isTaskOverdue(task);
-              const isCompleted = task.status === "Completed";
-              const priorityConfig = TASK_PRIORITY_CONFIG[task.priority];
-              const statusConfig = TASK_STATUS_CONFIG[task.status];
-
-              // Prerequisite names
               const dependencyTasks = (task.dependencyIds || [])
                 .map((id) => tasks.find((t) => t.id === id))
                 .filter((t): t is EventTask => Boolean(t));
 
               return (
-                <Card
+                <TaskCard
                   key={task.id}
-                  className={`p-5 transition-all border ${
-                    isCompleted
-                      ? "bg-[#FAF8F5]/80 border-[#EBE5DC] opacity-80"
-                      : isOverdue
-                      ? "bg-white border-[#C05621]/40 shadow-xs"
-                      : "bg-white border-[#EBE5DC] hover:border-[#C8963E]"
-                  }`}
-                >
-                  <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
-                    {/* Checkbox and Task Title */}
-                    <div className="flex items-start gap-3.5 flex-1">
-                      <button
-                        type="button"
-                        onClick={() => handleToggleComplete(task)}
-                        className={`w-6 h-6 rounded-lg border flex items-center justify-center shrink-0 mt-0.5 transition-colors cursor-pointer ${
-                          isCompleted
-                            ? "bg-[#3F7A56] border-[#3F7A56] text-white"
-                            : "border-[#6B635B]/40 hover:border-[#5B1D2E] bg-white"
-                        }`}
-                        title={isCompleted ? "Mark incomplete" : "Mark completed"}
-                      >
-                        {isCompleted && <Check className="w-4 h-4 stroke-[3]" />}
-                      </button>
-
-                      <div className="space-y-1.5 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3
-                            className={`font-semibold text-base ${
-                              isCompleted
-                                ? "line-through text-[#6B635B]"
-                                : "text-[#1F1A17]"
-                            }`}
-                          >
-                            {task.title}
-                          </h3>
-
-                          {/* Priority Badge */}
-                          <span
-                            className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                            style={{
-                              backgroundColor: priorityConfig.bg,
-                              color: priorityConfig.color,
-                              borderColor: priorityConfig.border,
-                              borderWidth: "1px",
-                            }}
-                          >
-                            {task.priority}
-                          </span>
-
-                          {/* Status Badge */}
-                          <span
-                            className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
-                            style={{
-                              backgroundColor: statusConfig.bg,
-                              color: statusConfig.color,
-                            }}
-                          >
-                            {task.status}
-                          </span>
-
-                          {/* Overdue Badge */}
-                          {isOverdue && (
-                            <span className="text-[11px] font-semibold px-2 py-0.5 bg-[#FFF5F0] text-[#C05621] border border-[#C05621]/30 rounded-full flex items-center gap-1">
-                              <AlertCircle className="w-3 h-3" /> Overdue
-                            </span>
-                          )}
-                        </div>
-
-                        {task.description && (
-                          <p className="text-xs text-[#6B635B] leading-relaxed max-w-2xl">
-                            {task.description}
-                          </p>
-                        )}
-
-                        {/* Dependencies & Blockers Display */}
-                        {dependencyTasks.length > 0 && (
-                          <div className="pt-1.5 flex flex-wrap items-center gap-1.5 text-xs">
-                            <span className="text-[11px] font-medium text-[#6B635B] flex items-center gap-1">
-                              <GitBranch className="w-3 h-3" /> Depends on:
-                            </span>
-                            {dependencyTasks.map((dep) => (
-                              <span
-                                key={dep.id}
-                                className={`text-[11px] px-2 py-0.5 rounded-md font-medium border flex items-center gap-1 ${
-                                  dep.status === "Completed"
-                                    ? "bg-[#F0F7F3] text-[#3F7A56] border-[#3F7A56]/20"
-                                    : "bg-[#FFF5F0] text-[#C05621] border-[#C05621]/30"
-                                }`}
-                                title={dep.status === "Completed" ? "Prerequisite fulfilled" : "Prerequisite not completed"}
-                              >
-                                {dep.status === "Completed" ? (
-                                  <Check className="w-2.5 h-2.5" />
-                                ) : (
-                                  <Clock className="w-2.5 h-2.5" />
-                                )}
-                                {dep.title}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Deadline & Actions */}
-                    <div className="flex sm:flex-col items-center sm:items-end justify-between w-full sm:w-auto gap-2.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-[#EBE5DC]">
-                      <div className="flex items-center gap-1.5 text-xs text-[#6B635B] font-mono">
-                        <Calendar className="w-3.5 h-3.5" />
-                        <span>Due: {task.dueDate}</span>
-                      </div>
-
-                      <div className="flex items-center gap-1.5">
-                        {/* Quick Status Dropdown */}
-                        <select
-                          value={task.status}
-                          onChange={(e) =>
-                            handleStatusChange(task.id, e.target.value as TaskStatus)
-                          }
-                          className="bg-white border border-[#EBE5DC] text-xs font-medium text-[#1F1A17] rounded-lg px-2 py-1 shadow-xs focus:outline-none focus:ring-1 focus:ring-[#5B1D2E]"
-                        >
-                          <option value="Not Started">Not Started</option>
-                          <option value="In Progress">In Progress</option>
-                          <option value="Completed">Completed</option>
-                          <option value="Delayed">Delayed</option>
-                        </select>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCycleError(null);
-                            setEditingTask(task);
-                          }}
-                          className="p-1.5 rounded-lg text-[#6B635B] hover:text-[#5B1D2E] hover:bg-[#F5F2EB] transition-colors"
-                          title="Edit Task"
-                          aria-label={`Edit task ${task.title}`}
-                        >
-                          <Edit2 className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteTask(task.id, task.title)}
-                          className="p-1.5 rounded-lg text-[#6B635B] hover:text-[#C05621] hover:bg-[#F5F2EB] transition-colors"
-                          title="Delete Task"
-                          aria-label={`Delete task ${task.title}`}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </Card>
+                  task={task}
+                  isOverdue={isOverdue}
+                  dependencyTasks={dependencyTasks}
+                  onToggleComplete={handleToggleComplete}
+                  onStatusChange={handleStatusChange}
+                  onEdit={(t) => {
+                    setCycleError(null);
+                    setEditingTask(t);
+                  }}
+                  onDelete={handleDeleteTask}
+                />
               );
             })}
           </div>
@@ -745,368 +489,33 @@ function TimelineTasksContent() {
 
         {/* Modal: Add Task */}
         {isAddModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-            <div
-              ref={addTaskModalRef}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="add-task-modal-title"
-              className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95 max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex items-center justify-between border-b border-[#EBE5DC] pb-3">
-                <h3 id="add-task-modal-title" className="font-serif text-xl font-bold text-[#1F1A17]">
-                  Add Celebration Task
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setIsAddModalOpen(false)}
-                  aria-label="Close dialog"
-                  className="p-1 text-[#6B635B] hover:text-[#1F1A17] rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {cycleError && (
-                <div className="p-3 bg-[#FFF5F0] border border-[#C05621] rounded-xl flex items-start gap-2 text-xs text-[#C05621]">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{cycleError}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleAddTaskSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                    Task Title *
-                  </label>
-                  <Input
-                    type="text"
-                    required
-                    placeholder="e.g. Schedule Pandit Ji for Muhurat Pooja"
-                    value={newTitle}
-                    onChange={(e) => setNewTitle(e.target.value)}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                    Description & Instructions
-                  </label>
-                  <Textarea
-                    placeholder="Details, key contacts, or specific checklist items..."
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                    rows={2}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                      Start Date
-                    </label>
-                    <Input
-                      type="date"
-                      value={newStartDate}
-                      onChange={(e) => setNewStartDate(e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                      Deadline (Due Date) *
-                    </label>
-                    <Input
-                      type="date"
-                      required
-                      value={newDueDate}
-                      onChange={(e) => setNewDueDate(e.target.value)}
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                      Priority Level
-                    </label>
-                    <select
-                      value={newPriority}
-                      onChange={(e) => setNewPriority(e.target.value as TaskPriority)}
-                      className="w-full bg-white border border-[#EBE5DC] rounded-xl px-3 py-2 text-sm text-[#1F1A17] focus:outline-none focus:ring-2 focus:ring-[#5B1D2E]"
-                    >
-                      <option value="High">High Priority</option>
-                      <option value="Medium">Medium Priority</option>
-                      <option value="Low">Low Priority</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                      Initial Status
-                    </label>
-                    <select
-                      value={newStatus}
-                      onChange={(e) => setNewStatus(e.target.value as TaskStatus)}
-                      className="w-full bg-white border border-[#EBE5DC] rounded-xl px-3 py-2 text-sm text-[#1F1A17] focus:outline-none focus:ring-2 focus:ring-[#5B1D2E]"
-                    >
-                      <option value="Not Started">Not Started</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Completed">Completed</option>
-                      <option value="Delayed">Delayed</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Prerequisite Dependencies Multi-select */}
-                {tasks.length > 0 && (
-                  <div>
-                    <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                      Prerequisites (Tasks that must be done first)
-                    </label>
-                    <p className="text-[11px] text-[#6B635B] mb-2">
-                      Cycle prevention is actively enforced to maintain a valid workflow.
-                    </p>
-                    <div className="max-h-36 overflow-y-auto space-y-1.5 p-2 bg-[#F5F2EB]/60 rounded-xl border border-[#EBE5DC]">
-                      {tasks.map((t) => {
-                        const isChecked = newDependencies.includes(t.id);
-                        return (
-                          <label
-                            key={t.id}
-                            className="flex items-center gap-2 p-1.5 hover:bg-white rounded-lg text-xs cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setNewDependencies((prev) => [...prev, t.id]);
-                                } else {
-                                  setNewDependencies((prev) =>
-                                    prev.filter((id) => id !== t.id)
-                                  );
-                                }
-                              }}
-                              className="w-4 h-4 rounded text-[#5B1D2E] focus:ring-[#5B1D2E]"
-                            />
-                            <span className="font-medium text-[#1F1A17]">{t.title}</span>
-                            <span className="text-[10px] text-[#6B635B] ml-auto">
-                              Due: {t.dueDate}
-                            </span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#EBE5DC]">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setIsAddModalOpen(false)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="primary">
-                    Create Task
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
+          <TaskModal
+            key="add-task"
+            isOpen={isAddModalOpen}
+            allTasks={tasks}
+            cycleError={cycleError}
+            onClose={() => {
+              setIsAddModalOpen(false);
+              setCycleError(null);
+            }}
+            onSave={handleAddTask}
+          />
         )}
 
         {/* Modal: Edit Task */}
         {editingTask && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-            <div
-              ref={editTaskModalRef}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="edit-task-modal-title"
-              className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95 max-h-[90vh] overflow-y-auto"
-            >
-              <div className="flex items-center justify-between border-b border-[#EBE5DC] pb-3">
-                <h3 id="edit-task-modal-title" className="font-serif text-xl font-bold text-[#1F1A17]">
-                  Edit Task & Dependencies
-                </h3>
-                <button
-                  type="button"
-                  onClick={() => setEditingTask(null)}
-                  aria-label="Close dialog"
-                  className="p-1 text-[#6B635B] hover:text-[#1F1A17] rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {cycleError && (
-                <div className="p-3 bg-[#FFF5F0] border border-[#C05621] rounded-xl flex items-start gap-2 text-xs text-[#C05621]">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{cycleError}</span>
-                </div>
-              )}
-
-              <form onSubmit={handleSaveEdit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                    Task Title *
-                  </label>
-                  <Input
-                    type="text"
-                    required
-                    value={editingTask.title}
-                    onChange={(e) =>
-                      setEditingTask({ ...editingTask, title: e.target.value })
-                    }
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                    Description & Instructions
-                  </label>
-                  <Textarea
-                    value={editingTask.description}
-                    onChange={(e) =>
-                      setEditingTask({ ...editingTask, description: e.target.value })
-                    }
-                    rows={2}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                      Start Date
-                    </label>
-                    <Input
-                      type="date"
-                      value={editingTask.startDate || ""}
-                      onChange={(e) =>
-                        setEditingTask({ ...editingTask, startDate: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                      Deadline (Due Date) *
-                    </label>
-                    <Input
-                      type="date"
-                      required
-                      value={editingTask.dueDate}
-                      onChange={(e) =>
-                        setEditingTask({ ...editingTask, dueDate: e.target.value })
-                      }
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                      Priority Level
-                    </label>
-                    <select
-                      value={editingTask.priority}
-                      onChange={(e) =>
-                        setEditingTask({
-                          ...editingTask,
-                          priority: e.target.value as TaskPriority,
-                        })
-                      }
-                      className="w-full bg-white border border-[#EBE5DC] rounded-xl px-3 py-2 text-sm text-[#1F1A17] focus:outline-none focus:ring-2 focus:ring-[#5B1D2E]"
-                    >
-                      <option value="High">High Priority</option>
-                      <option value="Medium">Medium Priority</option>
-                      <option value="Low">Low Priority</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                      Current Status
-                    </label>
-                    <select
-                      value={editingTask.status}
-                      onChange={(e) =>
-                        setEditingTask({
-                          ...editingTask,
-                          status: e.target.value as TaskStatus,
-                        })
-                      }
-                      className="w-full bg-white border border-[#EBE5DC] rounded-xl px-3 py-2 text-sm text-[#1F1A17] focus:outline-none focus:ring-2 focus:ring-[#5B1D2E]"
-                    >
-                      <option value="Not Started">Not Started</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Completed">Completed</option>
-                      <option value="Delayed">Delayed</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Prerequisites Multi-select */}
-                <div>
-                  <label className="block text-xs font-semibold text-[#1F1A17] mb-1">
-                    Prerequisites (Dependencies)
-                  </label>
-                  <p className="text-[11px] text-[#6B635B] mb-2">
-                    Cannot depend on itself or any task that transitively depends on it.
-                  </p>
-                  <div className="max-h-36 overflow-y-auto space-y-1.5 p-2 bg-[#F5F2EB]/60 rounded-xl border border-[#EBE5DC]">
-                    {tasks
-                      .filter((t) => t.id !== editingTask.id)
-                      .map((t) => {
-                        const isChecked = editingTask.dependencyIds.includes(t.id);
-                        return (
-                          <label
-                            key={t.id}
-                            className="flex items-center gap-2 p-1.5 hover:bg-white rounded-lg text-xs cursor-pointer"
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setEditingTask({
-                                    ...editingTask,
-                                    dependencyIds: [...editingTask.dependencyIds, t.id],
-                                  });
-                                } else {
-                                  setEditingTask({
-                                    ...editingTask,
-                                    dependencyIds: editingTask.dependencyIds.filter(
-                                      (id) => id !== t.id
-                                    ),
-                                  });
-                                }
-                              }}
-                              className="w-4 h-4 rounded text-[#5B1D2E] focus:ring-[#5B1D2E]"
-                            />
-                            <span className="font-medium text-[#1F1A17]">{t.title}</span>
-                            <span className="text-[10px] text-[#6B635B] ml-auto">
-                              Due: {t.dueDate}
-                            </span>
-                          </label>
-                        );
-                      })}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#EBE5DC]">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setEditingTask(null)}
-                  >
-                    Cancel
-                  </Button>
-                  <Button type="submit" variant="primary">
-                    Update Task
-                  </Button>
-                </div>
-              </form>
-            </div>
-          </div>
+          <TaskModal
+            key={`edit-task-${editingTask.id}`}
+            isOpen={Boolean(editingTask)}
+            task={editingTask}
+            allTasks={tasks}
+            cycleError={cycleError}
+            onClose={() => {
+              setEditingTask(null);
+              setCycleError(null);
+            }}
+            onSave={handleSaveEdit}
+          />
         )}
       </div>
     </AppLayout>

@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CURRENCY_OPTIONS, SPENDING_PRIORITIES, GUEST_AUDIENCE_OPTIONS } from "@/lib/constants";
 import { OnboardingFormData, WizardStepId } from "@/types/event";
+import { formatNumber } from "@/lib/utils";
 
 interface Step6ReviewProps {
   formData: OnboardingFormData;
@@ -132,7 +133,7 @@ export function Step6Review({
                 <p className="text-xs text-[#6B635B]">Total Available Budget</p>
                 <p className="font-mono text-2xl font-bold text-[#5B1D2E]">
                   {currencyObj.symbol}
-                  {Number(formData.totalBudget).toLocaleString()}{" "}
+                  {formatNumber(Number(formData.totalBudget))}{" "}
                   <span className="text-xs font-sans text-[#6B635B] font-normal">
                     ({formData.currency})
                   </span>
@@ -144,7 +145,7 @@ export function Step6Review({
                   <span className="text-[#6B635B]">Per-guest allocation:</span>
                   <span className="font-mono font-semibold text-[#1F1A17]">
                     {currencyObj.symbol}
-                    {perGuestCost.toLocaleString()} / guest
+                    {formatNumber(perGuestCost)} / guest
                   </span>
                 </div>
               )}

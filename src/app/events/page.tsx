@@ -13,6 +13,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { setActiveEventId, deleteEvent, createSampleEvent } from "@/lib/storage";
 import { useAllEvents, useActiveEvent, useIsClient } from "@/lib/use-store";
 import { CURRENCY_OPTIONS } from "@/lib/constants";
+import { formatNumber } from "@/lib/utils";
 
 export default function MyEventsPage() {
   const router = useRouter();
@@ -147,14 +148,14 @@ export default function MyEventsPage() {
                           <span className="text-xs text-[#544E47] block font-medium">Budget</span>
                           <span className="font-mono font-bold text-[#5B1D2E]">
                             {currencyObj.symbol}
-                            {ev.totalBudget.toLocaleString("en-IN")}
+                            {formatNumber(ev.totalBudget)}
                           </span>
                         </div>
                         <div>
                           <span className="text-xs text-[#544E47] block font-medium">Per Guest</span>
                           <span className="font-mono font-semibold text-[#1F1A17]">
                             {currencyObj.symbol}
-                            {ev.guestCount > 0 ? Math.round(ev.totalBudget / ev.guestCount).toLocaleString("en-IN") : 0}
+                            {ev.guestCount > 0 ? formatNumber(Math.round(ev.totalBudget / ev.guestCount)) : 0}
                           </span>
                         </div>
                       </div>

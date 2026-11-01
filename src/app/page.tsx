@@ -16,6 +16,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { createSampleEvent } from "@/lib/storage";
 import { useActiveEvent, useIsClient, useAllEvents } from "@/lib/use-store";
 import { CURRENCY_OPTIONS, ATMOSPHERE_OPTIONS, SPENDING_PRIORITIES } from "@/lib/constants";
+import { formatNumber } from "@/lib/utils";
 
 export default function DashboardPage() {
   const isClient = useIsClient();
@@ -159,7 +160,7 @@ export default function DashboardPage() {
                     Expected Guests
                   </span>
                   <p className="font-serif text-2xl font-bold text-[#1F1A17]">
-                    {activeEvent.guestCount.toLocaleString()}
+                    {formatNumber(activeEvent.guestCount)}
                   </p>
                   <p className="text-sm text-[#544E47] truncate pt-0.5">
                     {activeEvent.location}
@@ -174,7 +175,7 @@ export default function DashboardPage() {
                   </span>
                   <p className="font-mono text-2xl font-bold text-[#5B1D2E]">
                     {currencyObj.symbol}
-                    {activeEvent.totalBudget.toLocaleString("en-IN")}
+                    {formatNumber(activeEvent.totalBudget)}
                   </p>
                   <div className="pt-0.5">
                     <Badge variant={activeEvent.budgetFlexibility === "fixed" ? "error" : "accent"}>
@@ -269,7 +270,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="pt-4 mt-3 border-t border-[#EBE5DC] flex items-center justify-between">
                     <span className="font-mono text-xs font-bold text-[#5B1D2E]">
-                      {currencyObj.symbol}{activeEvent.totalBudget.toLocaleString("en-IN")}
+                      {currencyObj.symbol}{formatNumber(activeEvent.totalBudget)}
                     </span>
                     <Link href={`/budget?event_id=${activeEvent.id}`}>
                       <Button variant="outline" size="sm" className="text-xs">

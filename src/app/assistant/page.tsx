@@ -5,22 +5,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
   Sparkles,
-  ArrowRight,
   CheckCircle2,
   XCircle,
   AlertTriangle,
-  History,
   Send,
   HelpCircle,
-  TrendingDown,
-  TrendingUp,
-  Calendar,
-  Users,
-  PieChart,
-  ShieldCheck,
   ChevronDown,
-  Check,
-  X,
   Plus,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/app-layout";
@@ -39,6 +29,7 @@ import {
   getChangeHistoryForEvent,
   applyPlanRevision,
 } from "@/lib/storage";
+import { formatNumber } from "@/lib/utils";
 import {
   EventData,
   BudgetCategory,
@@ -46,7 +37,9 @@ import {
   PlanRevisionProposal,
   PlanChangeRecord,
 } from "@/types/event";
-import { getSuggestedQuestionGroups } from "@/lib/assistant-suggestions";
+import { SuggestedPromptsGrid } from "@/components/assistant/suggested-prompts-grid";
+import { RevisionProposalReview } from "@/components/assistant/revision-proposal-review";
+import { ChangeHistoryList } from "@/components/assistant/change-history-list";
 
 function AIAssistantContent() {
   const searchParams = useSearchParams();
@@ -274,7 +267,7 @@ function AIAssistantContent() {
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="flex items-center gap-3 text-sm text-[#6B635B]">
             <span className="w-5 h-5 border-2 border-[#5B1D2E] border-t-transparent rounded-full animate-spin" />
-            Loading AI Assistant & Adaptive Revision Engine...
+            Loading AI Assistant &amp; Adaptive Revision Engine...
           </div>
         </div>
       </AppLayout>
@@ -378,7 +371,7 @@ function AIAssistantContent() {
                 >
                   {allEvents.map((ev) => (
                     <option key={ev.id} value={ev.id}>
-                      {ev.name} ({currencySymbol}{ev.totalBudget.toLocaleString()})
+                      {ev.name} ({currencySymbol}{formatNumber(ev.totalBudget)})
                     </option>
                   ))}
                 </select>
@@ -420,7 +413,7 @@ function AIAssistantContent() {
             <div>
               <span className="text-[#6B635B] block">Total Budget:</span>
               <strong className="text-[#5B1D2E] text-sm font-mono font-bold">
-                {currencySymbol}{event.totalBudget.toLocaleString("en-IN")}
+                {currencySymbol}{formatNumber(event.totalBudget)}
               </strong>
             </div>
             <div>
@@ -518,51 +511,10 @@ function AIAssistantContent() {
             </form>
 
             {/* Try These Requests Section */}
-            <div className="pt-4 border-t border-[#EBE5DC] space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-[#C8963E]" />
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-[#1F1A17]">
-                    Try These Requests
-                  </h4>
-                </div>
-                <span className="text-[11px] text-[#6B635B]">
-                  Click any request to populate and edit before proposing
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                {getSuggestedQuestionGroups(event).map((group) => {
-                  const Icon = group.icon;
-                  return (
-                    <div
-                      key={group.category}
-                      className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#EBE5DC] space-y-2.5"
-                    >
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#C8963E]">
-                        <Icon className="w-3.5 h-3.5 shrink-0" />
-                        <span>{group.category}</span>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        {group.questions.map((q, idx) => (
-                          <button
-                            key={idx}
-                            type="button"
-                            onClick={() => handleSelectSuggestedQuestion(q)}
-                            className="w-full text-left text-xs font-medium p-2.5 rounded-lg bg-white hover:bg-[#F5F2EB] text-[#1F1A17] border border-[#EBE5DC] hover:border-[#C8963E]/60 transition-all cursor-pointer flex items-center justify-between group shadow-2xs"
-                            title="Click to populate in message input"
-                          >
-                            <span className="line-clamp-2 leading-relaxed">&ldquo;{q}&rdquo;</span>
-                            <ArrowRight className="w-3.5 h-3.5 text-[#6B635B] group-hover:text-[#5B1D2E] shrink-0 ml-2 transition-transform group-hover:translate-x-0.5" />
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <SuggestedPromptsGrid
+              event={event}
+              onSelectQuestion={handleSelectSuggestedQuestion}
+            />
           </div>
         </Card>
 
@@ -612,374 +564,20 @@ function AIAssistantContent() {
 
         {/* Structured Before-and-After Revision Proposal Review Screen */}
         {activeProposal && !activeProposal.requiresClarification && (
-          <div className="space-y-6 animate-in fade-in-50">
-            {/* Header / Review Banner */}
-            <div className="p-5 rounded-2xl bg-[#5B1D2E] text-white shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-semibold uppercase tracking-widest px-2 py-0.5 rounded-full bg-white/15 text-white">
-                    Step 5 of 7: Review Proposal
-                  </span>
-                  <span className="text-[10px] text-white/80 font-mono">
-                    Engine: {proposalSource === "gemini" ? "Gemini 2.5 Flash" : "Celebration Engine"}
-                  </span>
-                </div>
-                <h2 className="font-serif text-2xl font-bold tracking-tight">
-                  Proposed Plan Revision Review
-                </h2>
-                <p className="text-xs text-white/80 max-w-2xl leading-relaxed">
-                  Requested: &ldquo;{activeProposal.requestedChange}&rdquo; • Your original plan is safely preserved until you decide.
-                </p>
-              </div>
-
-              {/* Action Decision Buttons */}
-              <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleRejectProposal}
-                  className="bg-white/10 hover:bg-white/20 text-white border-white/20 flex-1 sm:flex-none"
-                >
-                  <X className="w-4 h-4" />
-                  Reject Changes
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleAcceptProposal}
-                  className="bg-[#C8963E] hover:bg-[#b08031] text-white font-bold flex-1 sm:flex-none shadow-sm"
-                >
-                  <Check className="w-4 h-4 stroke-[3]" />
-                  Accept Changes
-                </Button>
-              </div>
-            </div>
-
-            {proposalSource === "deterministic-fallback" && (
-              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200/80 text-xs text-amber-900 flex items-center gap-2.5">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                <span>
-                  <strong>Note:</strong> Proposal generated using the rule-based celebration planning engine (Gemini API offline or unconfigured). All mathematical constraints and budget trade-offs are calculated deterministically.
-                </span>
-              </div>
-            )}
-
-            {/* Explanation & Planning Assumptions */}
-            <Card className="p-5 border-[#EBE5DC] bg-white">
-              <div className="space-y-3">
-                <div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#C8963E] block mb-1">
-                    AI Revision Rationale
-                  </span>
-                  <p className="text-sm text-[#1F1A17] font-medium leading-relaxed">
-                    {activeProposal.explanation}
-                  </p>
-                </div>
-
-                {activeProposal.assumptions.length > 0 && (
-                  <div className="pt-2 border-t border-[#EBE5DC]">
-                    <span className="text-[11px] font-semibold text-[#6B635B] uppercase tracking-wider block mb-1">
-                      Planning Assumptions:
-                    </span>
-                    <ul className="space-y-1 text-xs text-[#6B635B]">
-                      {activeProposal.assumptions.map((assump, i) => (
-                        <li key={i} className="flex items-start gap-1.5">
-                          <span className="text-[#5B1D2E] font-bold">•</span>
-                          <span>{assump}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            {/* Event Level Changes (Guest Count, Budget, Date) */}
-            {activeProposal.eventChanges && (
-              <Card className="p-5 border-[#EBE5DC] bg-white">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#6B635B] block mb-3">
-                  Event Parameters Diff (Before &amp; After)
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  {activeProposal.eventChanges.guestCount && (
-                    <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#EBE5DC]">
-                      <span className="text-xs text-[#6B635B] block flex items-center gap-1 mb-1">
-                        <Users className="w-3.5 h-3.5 text-[#5B1D2E]" /> Guest Count
-                      </span>
-                      <div className="flex items-center gap-2 text-sm font-semibold">
-                        <span className="text-[#6B635B] line-through">
-                          {activeProposal.eventChanges.guestCount.previous} guests
-                        </span>
-                        <ArrowRight className="w-3.5 h-3.5 text-[#C8963E]" />
-                        <span className="text-[#1F1A17] font-bold text-base">
-                          {activeProposal.eventChanges.guestCount.proposed} guests
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeProposal.eventChanges.totalBudget && (
-                    <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#EBE5DC]">
-                      <span className="text-xs text-[#6B635B] block flex items-center gap-1 mb-1">
-                        <PieChart className="w-3.5 h-3.5 text-[#5B1D2E]" /> Total Budget Envelope
-                      </span>
-                      <div className="flex items-center gap-2 text-sm font-semibold">
-                        <span className="text-[#6B635B] line-through font-mono">
-                          {currencySymbol}{activeProposal.eventChanges.totalBudget.previous.toLocaleString("en-IN")}
-                        </span>
-                        <ArrowRight className="w-3.5 h-3.5 text-[#C8963E]" />
-                        <span className="text-[#5B1D2E] font-mono font-bold text-base">
-                          {currencySymbol}{activeProposal.eventChanges.totalBudget.proposed.toLocaleString("en-IN")}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeProposal.eventChanges.eventDate && (
-                    <div className="p-3.5 rounded-xl bg-[#FAF8F5] border border-[#EBE5DC]">
-                      <span className="text-xs text-[#6B635B] block flex items-center gap-1 mb-1">
-                        <Calendar className="w-3.5 h-3.5 text-[#5B1D2E]" /> Celebration Date
-                      </span>
-                      <div className="flex items-center gap-2 text-sm font-semibold">
-                        <span className="text-[#6B635B] line-through font-mono">
-                          {activeProposal.eventChanges.eventDate.previous}
-                        </span>
-                        <ArrowRight className="w-3.5 h-3.5 text-[#C8963E]" />
-                        <span className="text-[#1F1A17] font-mono font-bold text-base">
-                          {activeProposal.eventChanges.eventDate.proposed}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </Card>
-            )}
-
-            {/* Budget Category Impact (Before & After Table) */}
-            {activeProposal.categoryDiffs.length > 0 && (
-              <Card className="border-[#EBE5DC] overflow-hidden bg-white">
-                <div className="p-4 border-b border-[#EBE5DC] bg-[#FAF8F5] flex items-center justify-between">
-                  <div>
-                    <h3 className="font-serif text-lg font-bold text-[#1F1A17]">
-                      Budget Allocation Changes ({activeProposal.categoryDiffs.length})
-                    </h3>
-                    <p className="text-xs text-[#6B635B]">
-                      Deterministic calculations of proposed adjustments
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-xs text-[#6B635B] block">Budget Delta:</span>
-                    <span
-                      className={`font-mono font-bold text-sm ${
-                        activeProposal.budgetImpact.difference > 0
-                          ? "text-[#C05621]"
-                          : activeProposal.budgetImpact.difference < 0
-                          ? "text-[#3F7A56]"
-                          : "text-[#1F1A17]"
-                      }`}
-                    >
-                      {activeProposal.budgetImpact.difference > 0 ? "+" : ""}
-                      {currencySymbol}{activeProposal.budgetImpact.difference.toLocaleString("en-IN")}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="border-b border-[#EBE5DC] bg-white text-[#6B635B] font-semibold uppercase tracking-wider">
-                        <th className="py-3 px-4">Category</th>
-                        <th className="py-3 px-3 text-right">Previous Estimate</th>
-                        <th className="py-3 px-3 text-right">Proposed Estimate</th>
-                        <th className="py-3 px-3 text-right">Difference</th>
-                        <th className="py-3 px-4">Reasoning</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#EBE5DC]">
-                      {activeProposal.categoryDiffs.map((diff, idx) => (
-                        <tr key={idx} className="hover:bg-[#FAF8F5]/60 transition-colors">
-                          <td className="py-3 px-4 font-semibold text-[#1F1A17]">
-                            {diff.categoryName}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono text-[#6B635B]">
-                            {currencySymbol}{diff.previousEstimated.toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold text-[#1F1A17]">
-                            {currencySymbol}{diff.proposedEstimated.toLocaleString("en-IN")}
-                          </td>
-                          <td className="py-3 px-3 text-right font-mono font-bold">
-                            {diff.difference > 0 ? (
-                              <span className="text-[#C05621] flex items-center justify-end gap-1">
-                                <TrendingUp className="w-3.5 h-3.5" />
-                                +{currencySymbol}{diff.difference.toLocaleString("en-IN")}
-                              </span>
-                            ) : diff.difference < 0 ? (
-                              <span className="text-[#3F7A56] flex items-center justify-end gap-1">
-                                <TrendingDown className="w-3.5 h-3.5" />
-                                -{currencySymbol}{Math.abs(diff.difference).toLocaleString("en-IN")}
-                              </span>
-                            ) : (
-                              <span className="text-[#6B635B]">₹0</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-[#6B635B] max-w-xs leading-relaxed">
-                            {diff.reasoning}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Card>
-            )}
-
-            {/* Timeline & Task Rescheduling Impact */}
-            {activeProposal.taskDiffs.length > 0 && (
-              <Card className="border-[#EBE5DC] overflow-hidden bg-white">
-                <div className="p-4 border-b border-[#EBE5DC] bg-[#FAF8F5]">
-                  <h3 className="font-serif text-lg font-bold text-[#1F1A17]">
-                    Timeline &amp; Task Adjustments ({activeProposal.taskDiffs.length})
-                  </h3>
-                  <p className="text-xs text-[#6B635B]">
-                    Rescheduled milestone deadlines and new follow-up tasks
-                  </p>
-                </div>
-
-                <div className="p-4 space-y-2.5">
-                  {activeProposal.taskDiffs.map((tDiff, i) => (
-                    <div
-                      key={i}
-                      className="p-3 rounded-xl bg-[#FAF8F5] border border-[#EBE5DC] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-sm text-[#1F1A17]">
-                            {tDiff.title}
-                          </span>
-                          <span className="text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-full bg-white text-[#C8963E] border border-[#C8963E]/30">
-                            {tDiff.action}
-                          </span>
-                        </div>
-                        <p className="text-xs text-[#6B635B] mt-0.5">{tDiff.reasoning}</p>
-                      </div>
-
-                      <div className="flex items-center gap-2 font-mono text-xs shrink-0">
-                        {tDiff.previousDueDate && (
-                          <span className="text-[#6B635B] line-through">
-                            {tDiff.previousDueDate}
-                          </span>
-                        )}
-                        {tDiff.previousDueDate && <ArrowRight className="w-3 h-3 text-[#C8963E]" />}
-                        <span className="font-bold text-[#1F1A17] bg-white px-2 py-1 rounded border border-[#EBE5DC]">
-                          Due: {tDiff.proposedDueDate}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-
-            {/* Unchanged Information Guarantee */}
-            <div className="p-4 rounded-xl bg-[#F0F7F3] border border-[#3F7A56]/30 flex items-center justify-between gap-3 text-xs text-[#3F7A56]">
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="w-4 h-4 shrink-0 text-[#3F7A56]" />
-                <span className="font-medium">
-                  <strong>Data Integrity Guarantee:</strong> {activeProposal.affectedUnchangedSummary.summary} Unrelated contracts and preferences remain untouched.
-                </span>
-              </div>
-              <Badge variant="accent">Zero Unrelated Overwrite</Badge>
-            </div>
-
-            {/* Warnings if any */}
-            {activeProposal.warnings.length > 0 && (
-              <div className="p-4 rounded-xl bg-[#FFF5F0] border border-[#C05621]/40 space-y-1.5 text-xs text-[#C05621]">
-                <div className="flex items-center gap-2 font-bold text-sm">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span>Important Planning Advisories</span>
-                </div>
-                <ul className="space-y-1 list-disc list-inside">
-                  {activeProposal.warnings.map((w, i) => (
-                    <li key={i}>{w}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Action Buttons Footer */}
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#EBE5DC]">
-              <Button type="button" variant="ghost" size="md" onClick={handleRejectProposal}>
-                <X className="w-4 h-4" /> Discard &amp; Keep Original Plan
-              </Button>
-              <Button type="button" variant="primary" size="md" onClick={handleAcceptProposal}>
-                <Check className="w-4 h-4 stroke-[3]" /> Confirm &amp; Apply Changes
-              </Button>
-            </div>
-          </div>
+          <RevisionProposalReview
+            proposal={activeProposal}
+            proposalSource={proposalSource}
+            currencySymbol={currencySymbol}
+            onAccept={handleAcceptProposal}
+            onReject={handleRejectProposal}
+          />
         )}
 
         {/* Change History Section */}
-        <section className="space-y-4 pt-6 border-t border-[#EBE5DC]">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <History className="w-5 h-5 text-[#5B1D2E]" />
-              <h2 className="font-serif text-xl font-bold text-[#1F1A17]">
-                Plan Evolution &amp; Change History
-              </h2>
-            </div>
-            <Badge variant="default">{changeHistory.length} Accepted Revisions</Badge>
-          </div>
-
-          {changeHistory.length === 0 ? (
-            <Card className="p-6 text-center text-xs text-[#6B635B] bg-white border-[#EBE5DC]">
-              <p>No plan revisions have been accepted yet for &ldquo;{event.name}&rdquo;.</p>
-              <p className="mt-1 text-[11px]">
-                Submit a change request above to adapt your plan. When you accept proposals, a full audit trail will appear here.
-              </p>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {changeHistory.map((rec) => (
-                <Card key={rec.id} className="p-4 bg-white border-[#EBE5DC] text-xs space-y-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#EBE5DC] pb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#FFF9F0] text-[#C8963E] border border-[#C8963E]/30">
-                        {rec.changeType}
-                      </span>
-                      <strong className="text-sm font-semibold text-[#1F1A17]">
-                        &ldquo;{rec.requestedChange}&rdquo;
-                      </strong>
-                    </div>
-                    <span className="text-[#6B635B] font-mono text-[11px]">
-                      {new Date(rec.createdAt).toLocaleString("en-IN", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
-                    </span>
-                  </div>
-
-                  <p className="text-[#1F1A17] leading-relaxed">{rec.explanation}</p>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 text-[11px] text-[#6B635B]">
-                    <div>
-                      <span className="font-medium text-[#1F1A17]">Previous Value: </span>
-                      <span>{rec.previousValue}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-[#1F1A17]">New Value: </span>
-                      <span className="font-semibold text-[#3F7A56]">{rec.newValue}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-[#1F1A17]">Affected: </span>
-                      <span>
-                        {rec.affectedCategories.length} categories, {rec.affectedTasks.length} tasks
-                      </span>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </section>
+        <ChangeHistoryList
+          changeHistory={changeHistory}
+          eventName={event.name}
+        />
       </div>
     </AppLayout>
   );

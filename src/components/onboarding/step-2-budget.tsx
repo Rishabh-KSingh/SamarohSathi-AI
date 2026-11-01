@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { CURRENCY_OPTIONS } from "@/lib/constants";
 import { OnboardingFormData, BudgetFlexibility } from "@/types/event";
 import { ValidationErrors } from "@/lib/validation";
-import { cn } from "@/lib/utils";
+import { cn, formatNumber } from "@/lib/utils";
 
 interface Step2BudgetProps {
   formData: OnboardingFormData;
@@ -124,13 +124,13 @@ export function Step2Budget({ formData, errors, onChange }: Step2BudgetProps) {
               </p>
               <p className="text-[#6B635B]">
                 Based on {formData.guestCount} guests and {currencyObj.symbol}
-                {Number(formData.totalBudget).toLocaleString()} total budget.
+                {formatNumber(Number(formData.totalBudget))} total budget.
               </p>
             </div>
           </div>
           <div className="px-3 py-1.5 rounded-lg bg-white border border-[#EBE5DC] font-mono text-sm font-semibold text-[#5B1D2E]">
             {currencyObj.symbol}
-            {perGuestCost.toLocaleString()} / guest
+            {formatNumber(perGuestCost)} / guest
           </div>
         </div>
       )}
