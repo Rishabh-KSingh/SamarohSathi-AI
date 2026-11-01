@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+:root {
+  /* Direction 1: Royal Heritage & Sandalwood */
+  --background: #FBF9F5;
+  --surface: #FFFFFF;
+  --sidebar: #F5F2EB;
+  
+  --primary: #5B1D2E;
+  --primary-foreground: #FFFFFF;
+  
+  --accent: #C8963E;
+  --accent-foreground: #1F1A17;
+  
+  --main: #1F1A17;
+  --muted: #6B635B;
+  --border: #EBE5DC;
+  
+  --success: #3F7A56;
+  --warning: #D9822B;
+  --error: #C23B38;
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-sidebar: var(--sidebar);
+  
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  
+  --color-main: var(--main);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+
+  --font-serif: var(--font-serif), "Playfair Display", Georgia, serif;
+  --font-sans: var(--font-sans), "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+
+  --radius-2xl: 1rem;
+  --radius-xl: 0.75rem;
+}
+
+/* Base resets & typography */
+html, body {
+  background-color: var(--background);
+  color: var(--main);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar matching Warm Linen theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
+}
