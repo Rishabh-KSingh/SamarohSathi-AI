@@ -37,6 +37,7 @@ import {
   updateTask,
   deleteTask,
 } from "@/lib/storage";
+import { useModalA11y } from "@/lib/use-modal-a11y";
 import { generateDeterministicTasks, detectDependencyCycle } from "@/lib/planner-engine";
 import { EventData, EventTask, TaskPriority, TaskStatus } from "@/types/event";
 import { TASK_STATUS_CONFIG, TASK_PRIORITY_CONFIG } from "@/lib/constants";
@@ -60,6 +61,10 @@ function TimelineTasksContent() {
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editingTask, setEditingTask] = React.useState<EventTask | null>(null);
   const [cycleError, setCycleError] = React.useState<string | null>(null);
+
+  // Accessible modal focus management & Escape dismissal
+  const addTaskModalRef = useModalA11y(isAddModalOpen, () => setIsAddModalOpen(false));
+  const editTaskModalRef = useModalA11y(Boolean(editingTask), () => setEditingTask(null));
 
   // Form states for Add Task
   const [newTitle, setNewTitle] = React.useState("");
@@ -716,6 +721,7 @@ function TimelineTasksContent() {
                           }}
                           className="p-1.5 rounded-lg text-[#6B635B] hover:text-[#5B1D2E] hover:bg-[#F5F2EB] transition-colors"
                           title="Edit Task"
+                          aria-label={`Edit task ${task.title}`}
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
@@ -724,6 +730,7 @@ function TimelineTasksContent() {
                           onClick={() => handleDeleteTask(task.id, task.title)}
                           className="p-1.5 rounded-lg text-[#6B635B] hover:text-[#C05621] hover:bg-[#F5F2EB] transition-colors"
                           title="Delete Task"
+                          aria-label={`Delete task ${task.title}`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -739,14 +746,21 @@ function TimelineTasksContent() {
         {/* Modal: Add Task */}
         {isAddModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div
+              ref={addTaskModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="add-task-modal-title"
+              className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95 max-h-[90vh] overflow-y-auto"
+            >
               <div className="flex items-center justify-between border-b border-[#EBE5DC] pb-3">
-                <h3 className="font-serif text-xl font-bold text-[#1F1A17]">
+                <h3 id="add-task-modal-title" className="font-serif text-xl font-bold text-[#1F1A17]">
                   Add Celebration Task
                 </h3>
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
+                  aria-label="Close dialog"
                   className="p-1 text-[#6B635B] hover:text-[#1F1A17] rounded-lg"
                 >
                   <X className="w-5 h-5" />
@@ -904,14 +918,21 @@ function TimelineTasksContent() {
         {/* Modal: Edit Task */}
         {editingTask && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div
+              ref={editTaskModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="edit-task-modal-title"
+              className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95 max-h-[90vh] overflow-y-auto"
+            >
               <div className="flex items-center justify-between border-b border-[#EBE5DC] pb-3">
-                <h3 className="font-serif text-xl font-bold text-[#1F1A17]">
+                <h3 id="edit-task-modal-title" className="font-serif text-xl font-bold text-[#1F1A17]">
                   Edit Task & Dependencies
                 </h3>
                 <button
                   type="button"
                   onClick={() => setEditingTask(null)}
+                  aria-label="Close dialog"
                   className="p-1 text-[#6B635B] hover:text-[#1F1A17] rounded-lg"
                 >
                   <X className="w-5 h-5" />

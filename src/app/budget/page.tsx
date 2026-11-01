@@ -35,6 +35,7 @@ import {
   deleteCategory,
   getQuotationsForEvent,
 } from "@/lib/storage";
+import { useModalA11y } from "@/lib/use-modal-a11y";
 import { generateDeterministicBudgetCategories } from "@/lib/planner-engine";
 import { EventData, BudgetCategory, CategoryPriority, BudgetTradeoffSuggestion, BudgetTradeoffItem, VendorQuotation } from "@/types/event";
 
@@ -55,6 +56,11 @@ function BudgetPlannerContent() {
   const [tradeoffSuggestions, setTradeoffSuggestions] = React.useState<BudgetTradeoffSuggestion | null>(null);
   const [isLoadingTradeoffs, setIsLoadingTradeoffs] = React.useState(false);
   const [appliedTradeoffs, setAppliedTradeoffs] = React.useState<string[]>([]);
+
+  // Accessible modal focus management & Escape dismissal
+  const addCategoryModalRef = useModalA11y(isAddModalOpen, () => setIsAddModalOpen(false));
+  const editCategoryModalRef = useModalA11y(Boolean(editingCategory), () => setEditingCategory(null));
+  const tradeoffsModalRef = useModalA11y(isTradeoffsModalOpen, () => setIsTradeoffsModalOpen(false));
 
   // Form inputs for Add
   const [newCatName, setNewCatName] = React.useState("");
@@ -729,6 +735,7 @@ function BudgetPlannerContent() {
                             onClick={() => setEditingCategory(c)}
                             className="p-1.5 rounded-lg text-[#6B635B] hover:text-[#5B1D2E] hover:bg-[#F5F2EB] transition-colors"
                             title="Edit Category & Amounts"
+                            aria-label={`Edit category ${c.name}`}
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
@@ -737,6 +744,7 @@ function BudgetPlannerContent() {
                             onClick={() => handleDeleteCategory(c.id, c.name)}
                             className="p-1.5 rounded-lg text-[#6B635B] hover:text-[#C05621] hover:bg-[#F5F2EB] transition-colors"
                             title="Delete Category"
+                            aria-label={`Delete category ${c.name}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </button>
@@ -773,14 +781,21 @@ function BudgetPlannerContent() {
         {/* Modal: Add Category */}
         {isAddModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95">
+            <div
+              ref={addCategoryModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="add-category-modal-title"
+              className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95"
+            >
               <div className="flex items-center justify-between border-b border-[#EBE5DC] pb-3">
-                <h3 className="font-serif text-xl font-bold text-[#1F1A17]">
+                <h3 id="add-category-modal-title" className="font-serif text-xl font-bold text-[#1F1A17]">
                   Add Expense Category
                 </h3>
                 <button
                   type="button"
                   onClick={() => setIsAddModalOpen(false)}
+                  aria-label="Close dialog"
                   className="p-1 text-[#6B635B] hover:text-[#1F1A17] rounded-lg"
                 >
                   <X className="w-5 h-5" />
@@ -880,14 +895,21 @@ function BudgetPlannerContent() {
         {/* Modal: Edit Category */}
         {editingCategory && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95">
+            <div
+              ref={editCategoryModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="edit-category-modal-title"
+              className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95"
+            >
               <div className="flex items-center justify-between border-b border-[#EBE5DC] pb-3">
-                <h3 className="font-serif text-xl font-bold text-[#1F1A17]">
+                <h3 id="edit-category-modal-title" className="font-serif text-xl font-bold text-[#1F1A17]">
                   Edit Expense Category
                 </h3>
                 <button
                   type="button"
                   onClick={() => setEditingCategory(null)}
+                  aria-label="Close dialog"
                   className="p-1 text-[#6B635B] hover:text-[#1F1A17] rounded-lg"
                 >
                   <X className="w-5 h-5" />
@@ -998,14 +1020,20 @@ function BudgetPlannerContent() {
         {/* Modal: AI Trade-Off Suggestions */}
         {isTradeoffsModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95 max-h-[90vh] overflow-y-auto">
+            <div
+              ref={tradeoffsModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="tradeoffs-modal-title"
+              className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-[#EBE5DC] space-y-5 animate-in fade-in-50 zoom-in-95 max-h-[90vh] overflow-y-auto"
+            >
               <div className="flex items-center justify-between border-b border-[#EBE5DC] pb-3">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-[#C8963E]/15 text-[#C8963E]">
                     <Sparkles className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-serif text-xl font-bold text-[#1F1A17]">
+                    <h3 id="tradeoffs-modal-title" className="font-serif text-xl font-bold text-[#1F1A17]">
                       AI Budget Trade-Off Recommendations
                     </h3>
                     <p className="text-xs text-[#6B635B]">
@@ -1016,6 +1044,7 @@ function BudgetPlannerContent() {
                 <button
                   type="button"
                   onClick={() => setIsTradeoffsModalOpen(false)}
+                  aria-label="Close dialog"
                   className="p-1 text-[#6B635B] hover:text-[#1F1A17] rounded-lg"
                 >
                   <X className="w-5 h-5" />

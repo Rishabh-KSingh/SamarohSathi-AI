@@ -1109,19 +1109,6 @@ export function seedInitialVendorsForEvent(eventId: string): Vendor[] {
       status: "Quotation Received",
     },
     {
-      name: "Classic Magadh Bhojnalaya",
-      category: "Caterer",
-      contactDetails: {
-        phone: "+91 94310 11005",
-        email: "orders@magadhbhojnalaya-example.in",
-        contactPerson: "Pandit Ramadhar Sharma",
-        address: "Exhibition Road, Patna, Bihar",
-      },
-      requirements: "Pure Satvik traditional wedding thali setup.",
-      notes: "Specializes in traditional Vedic rituals and senior citizen dietary care.",
-      status: "Researching",
-    },
-    {
       name: "Magadh Candid Wedding Cinematography",
       category: "Photographer",
       contactDetails: {

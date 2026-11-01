@@ -4,7 +4,18 @@ import { proposePlanRevisionWithGemini } from "@/lib/gemini";
 
 export async function POST(req: NextRequest) {
   try {
-    const rawBody = await req.json();
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Invalid JSON payload in request body.",
+        },
+        { status: 400 }
+      );
+    }
 
     const parseResult = PlanRevisionInputSchema.safeParse(rawBody);
     if (!parseResult.success) {
@@ -26,13 +37,11 @@ export async function POST(req: NextRequest) {
       source,
     });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Unknown error";
     console.error("API /api/propose-revision error:", err);
     return NextResponse.json(
       {
         success: false,
-        error: "Internal server error while interpreting plan revision.",
-        message,
+        error: "An unexpected internal server error occurred while interpreting plan revision.",
       },
       { status: 500 }
     );

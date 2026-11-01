@@ -50,6 +50,7 @@ import {
   getCategoriesForEvent,
   updateCategory,
 } from "@/lib/storage";
+import { useModalA11y } from "@/lib/use-modal-a11y";
 import {
   EventData,
   Vendor,
@@ -122,6 +123,10 @@ function VendorsContent() {
   const [qTerms, setQTerms] = React.useState("");
   const [qMissingInfoText, setQMissingInfoText] = React.useState("");
   const [qNotes, setQNotes] = React.useState("");
+
+  // Accessible modal focus management & Escape dismissal
+  const vendorModalRef = useModalA11y(isVendorModalOpen, () => setIsVendorModalOpen(false));
+  const quotationModalRef = useModalA11y(isQuotationModalOpen, () => setIsQuotationModalOpen(false));
 
   // Question Preparation State
   const [selectedCategoryForQuestions, setSelectedCategoryForQuestions] = React.useState<VendorCategory>("Caterer");
@@ -899,6 +904,7 @@ ${preparedQuestions.tips.map((t) => `• ${t}`).join("\n")}`;
                             onClick={() => handleOpenEditVendor(v)}
                             className="p-1.5 text-[#6B635B] hover:text-[#5B1D2E] hover:bg-[#FAF8F5] rounded-md transition-colors"
                             title="Edit Vendor"
+                            aria-label={`Edit vendor details for ${v.name}`}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
@@ -907,6 +913,7 @@ ${preparedQuestions.tips.map((t) => `• ${t}`).join("\n")}`;
                             onClick={() => handleDeleteVendor(v.id, v.name)}
                             className="p-1.5 text-[#6B635B] hover:text-[#C05621] hover:bg-[#FFF5F5] rounded-md transition-colors"
                             title="Delete Vendor"
+                            aria-label={`Delete vendor ${v.name}`}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1125,6 +1132,7 @@ ${preparedQuestions.tips.map((t) => `• ${t}`).join("\n")}`;
                             onClick={() => handleOpenEditQuotation(q)}
                             className="p-1.5 text-[#6B635B] hover:text-[#5B1D2E] hover:bg-[#FAF8F5] rounded-md transition-colors"
                             title="Edit Quotation"
+                            aria-label={`Edit quotation from ${q.vendorName}`}
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
@@ -1133,6 +1141,7 @@ ${preparedQuestions.tips.map((t) => `• ${t}`).join("\n")}`;
                             onClick={() => handleDeleteQuotation(q.id)}
                             className="p-1.5 text-[#6B635B] hover:text-[#C05621] hover:bg-[#FFF5F5] rounded-md transition-colors"
                             title="Delete Quotation"
+                            aria-label={`Delete quotation from ${q.vendorName}`}
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
@@ -1877,14 +1886,21 @@ ${preparedQuestions.tips.map((t) => `• ${t}`).join("\n")}`;
         {/* ============================================================ */}
         {isVendorModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 max-h-[90vh] overflow-y-auto">
+            <div
+              ref={vendorModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="vendor-modal-title"
+              className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 max-h-[90vh] overflow-y-auto"
+            >
               <div className="flex items-center justify-between border-b border-[#EBE5DC] pb-3">
-                <h3 className="font-serif text-xl font-bold text-[#1F1A17]">
+                <h3 id="vendor-modal-title" className="font-serif text-xl font-bold text-[#1F1A17]">
                   {editingVendor ? "Edit Vendor Details" : "Add Celebration Vendor"}
                 </h3>
                 <button
                   type="button"
                   onClick={() => setIsVendorModalOpen(false)}
+                  aria-label="Close vendor dialog"
                   className="text-[#6B635B] hover:text-[#1F1A17] text-lg font-bold"
                 >
                   ✕
@@ -2030,14 +2046,21 @@ ${preparedQuestions.tips.map((t) => `• ${t}`).join("\n")}`;
         {/* ============================================================ */}
         {isQuotationModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs">
-            <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 max-h-[90vh] overflow-y-auto">
+            <div
+              ref={quotationModalRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="quotation-modal-title"
+              className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl border border-[#EBE5DC] space-y-5 max-h-[90vh] overflow-y-auto"
+            >
               <div className="flex items-center justify-between border-b border-[#EBE5DC] pb-3">
-                <h3 className="font-serif text-xl font-bold text-[#1F1A17]">
+                <h3 id="quotation-modal-title" className="font-serif text-xl font-bold text-[#1F1A17]">
                   {editingQuotation ? "Edit Quotation Details" : "Record Vendor Quotation"}
                 </h3>
                 <button
                   type="button"
                   onClick={() => setIsQuotationModalOpen(false)}
+                  aria-label="Close quotation dialog"
                   className="text-[#6B635B] hover:text-[#1F1A17] text-lg font-bold"
                 >
                   ✕

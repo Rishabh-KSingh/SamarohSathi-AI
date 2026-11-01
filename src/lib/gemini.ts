@@ -106,6 +106,88 @@ function getGeminiClient(): GoogleGenAI | null {
 }
 
 /**
+ * Robustly extracts and parses JSON from AI model text:
+ * - Extracts JSON from markdown fences (```json ... ```)
+ * - Uses a string-aware brace balancer to cleanly isolate JSON objects/arrays even
+ *   when surrounded by leading explanation or trailing commentary with curly braces.
+ * - Safely handles quotes, escape sequences, and braces inside string literals.
+ * - Validates parsed data against a Zod schema.
+ */
+export function safeExtractJSON<T>(text: string, schema: { parse: (val: unknown) => T }): T {
+  if (!text || typeof text !== "string") {
+    throw new Error("Empty response received from Gemini API");
+  }
+
+  let cleaned = text.trim();
+
+  // 1. If text contains a markdown code fence, extract the fenced block first
+  const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenceMatch && fenceMatch[1]) {
+    cleaned = fenceMatch[1].trim();
+  }
+
+  // 2. Identify the root JSON token ({ for object, [ for array)
+  const firstBrace = cleaned.indexOf("{");
+  const firstBracket = cleaned.indexOf("[");
+
+  let startChar = "";
+  let endChar = "";
+  let startIdx = -1;
+
+  if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
+    startChar = "{";
+    endChar = "}";
+    startIdx = firstBrace;
+  } else if (firstBracket !== -1) {
+    startChar = "[";
+    endChar = "]";
+    startIdx = firstBracket;
+  }
+
+  if (startIdx !== -1) {
+    // 3. String-aware state machine to balance braces and find the exact closing token
+    let depth = 0;
+    let inString = false;
+    let isEscaped = false;
+    let endIdx = -1;
+
+    for (let i = startIdx; i < cleaned.length; i++) {
+      const char = cleaned[i];
+
+      if (inString) {
+        if (isEscaped) {
+          isEscaped = false;
+        } else if (char === "\\") {
+          isEscaped = true;
+        } else if (char === '"') {
+          inString = false;
+        }
+      } else {
+        if (char === '"') {
+          inString = true;
+          isEscaped = false;
+        } else if (char === startChar) {
+          depth++;
+        } else if (char === endChar) {
+          depth--;
+          if (depth === 0) {
+            endIdx = i;
+            break;
+          }
+        }
+      }
+    }
+
+    if (endIdx !== -1 && endIdx >= startIdx) {
+      cleaned = cleaned.slice(startIdx, endIdx + 1);
+    }
+  }
+
+  const parsed = JSON.parse(cleaned);
+  return schema.parse(parsed);
+}
+
+/**
  * Server-side AI Event Plan Generator using Gemini 2.5 Flash with fallback
  */
 export async function generateAIEventPlan(
@@ -221,13 +303,8 @@ Generate JSON with:
       },
     });
 
-    const text = response.text;
-    if (!text) {
-      throw new Error("Empty response from Gemini API");
-    }
-
-    const parsedJson = JSON.parse(text);
-    const validated = AIPlanResponseSchema.parse(parsedJson);
+    const text = response.text || "";
+    const validated = safeExtractJSON(text, AIPlanResponseSchema);
 
     return {
       plan: validated,
@@ -357,11 +434,8 @@ ${JSON.stringify(input.currentExpenses, null, 2)}`;
       },
     });
 
-    const text = response.text;
-    if (!text) throw new Error("Empty response from Gemini");
-
-    const parsedJson = JSON.parse(text);
-    const validated = BudgetTradeoffResponseSchema.parse(parsedJson);
+    const text = response.text || "";
+    const validated = safeExtractJSON(text, BudgetTradeoffResponseSchema);
 
     return {
       ...validated,
@@ -474,11 +548,8 @@ User's Requested Change:
       },
     });
 
-    const text = response.text;
-    if (!text) throw new Error("Empty response from Gemini API");
-
-    const parsedJson = JSON.parse(text);
-    const validated = AIPlanRevisionResponseSchema.parse(parsedJson);
+    const text = response.text || "";
+    const validated = safeExtractJSON(text, AIPlanRevisionResponseSchema);
 
     // Run deterministic application calculations on AI proposal
     const proposal = constructRevisionProposal(input, validated);
@@ -548,11 +619,8 @@ ${input.existingPlanSummary ? `- Existing Plan Context: ${input.existingPlanSumm
       },
     });
 
-    const text = response.text;
-    if (!text) throw new Error("Empty response from Gemini");
-
-    const parsedJson = JSON.parse(text);
-    const validated = VendorQuestionResponseSchema.parse(parsedJson);
+    const text = response.text || "";
+    const validated = safeExtractJSON(text, VendorQuestionResponseSchema);
 
     return {
       result: validated,
@@ -616,11 +684,8 @@ ${JSON.stringify(input.quotations, null, 2)}`;
       },
     });
 
-    const text = response.text;
-    if (!text) throw new Error("Empty response from Gemini");
-
-    const parsedJson = JSON.parse(text);
-    const validated = QuotationComparisonResponseSchema.parse(parsedJson);
+    const text = response.text || "";
+    const validated = safeExtractJSON(text, QuotationComparisonResponseSchema);
 
     const result: QuotationComparisonResult = {
       comparisonSummary: validated.comparisonSummary,

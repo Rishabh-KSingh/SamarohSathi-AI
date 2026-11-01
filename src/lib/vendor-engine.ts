@@ -434,9 +434,9 @@ export function generateDeterministicQuotationComparison(
     }
 
     // Align with user celebration priorities
-    const isHighPriority = userPriorities.some(
+    const isHighPriority = userPriorities?.some(
       (p) => p.toLowerCase() === req.category.toLowerCase()
-    );
+    ) || false;
     if (isHighPriority && servicesCount >= 3) {
       score += 8;
       strengths.push(`Aligns with your primary celebration priority (${req.category}) by providing robust service scope.`);
